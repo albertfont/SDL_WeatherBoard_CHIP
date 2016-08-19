@@ -27,6 +27,7 @@ sys.path.append('./SDL_Pi_WeatherRack')
 import SDL_DS3231
 import BMP280
 import SDL_Pi_WeatherRack as SDL_Pi_WeatherRack
+import Database
 
 
 ################
@@ -35,28 +36,11 @@ import SDL_Pi_WeatherRack as SDL_Pi_WeatherRack
 
 as3935_Interrupt_Happened = False;
 
-config.AS3935_Present = False
 config.DS3231_Present = True 
 config.BMP280_Present = False
-config.FRAM_Present = False
 config.HTU21DF_Present = False
-config.AM2315_Present = False
 config.ADS1015_Present = False
 config.ADS1115_Present = False
-config.OLED_Present = False
-
-
-def returnStatusLine(device, state):
-
-	returnString = device
-	if (state == True):
-		returnString = returnString + ":   \t\tPresent" 
-	else:
-		returnString = returnString + ":   \t\tNot Present"
-	return returnString
-
-
-
 
 
 ###############   
@@ -95,26 +79,10 @@ ds3231 = SDL_DS3231.SDL_DS3231(2, 0x68)
 
 
 try:
-
 	#comment out the next line after the clock has been initialized
 	# ds3231.write_now()
 	print "DS3231=\t\t%s" % ds3231.read_datetime()
 	config.DS3231_Present = True
-	print "----------------- "
-	print "----------------- "
-	print " AT24C32 EEPROM"
-	print "----------------- "
-	print "writing first 4 addresses with random data"
-	for x in range(0,4):
-		value = random.randint(0,255)
-		print "address = %i writing value=%i" % (x, value) 	
-		ds3231.write_AT24C32_byte(x, value)
-	print "----------------- "
-	
-	print "reading first 4 addresses"
-	for x in range(0,4):
-		print "address = %i value = %i" %(x, ds3231.read_AT24C32_byte(x)) 
-	print "----------------- "
 
 except IOError as e:
 	#    print "I/O error({0}): {1}".format(e.errno, e.strerror)
@@ -159,26 +127,6 @@ print ""
 
 totalRain = 0
 
-
-# print "----------------------"
-# print returnStatusLine("DS3231",config.DS3231_Present)
-# print returnStatusLine("BMP280",config.BMP280_Present)
-# print returnStatusLine("FRAM",config.FRAM_Present)
-# print returnStatusLine("HTU21DF",config.HTU21DF_Present)
-# print returnStatusLine("AM2315",config.AM2315_Present)
-# print returnStatusLine("ADS1015",config.ADS1015_Present)
-# print returnStatusLine("ADS1115",config.ADS1115_Present)
-# print returnStatusLine("AS3935",config.AS3935_Present)
-# print returnStatusLine("OLED",config.OLED_Present)
-# print returnStatusLine("SunAirPlus",config.SunAirPlus_Present)
-# print "----------------------"
-
-
-
-
-
-
-
 while True:
 
 
@@ -198,9 +146,6 @@ while True:
 	 
 		print "Chip  =\t\t" + time.strftime("%Y-%m-%d %H:%M:%S")
 
-		if (config.OLED_Present):
-			Scroll_SSD1306.addLineOLED(display,"%s" % ds3231.read_datetime())
-
 		print "DS3231=\t\t%s" % ds3231.read_datetime()
 	
 		print "DS3231 Temperature= \t%0.2f C" % ds3231.getTemp()
@@ -213,18 +158,12 @@ while True:
 	print "----------------- "
 	#
 
- 	currentWindSpeed = weatherStation.current_wind_speed()/1.6
-  	currentWindGust = weatherStation.get_wind_gust()/1.6
-  	totalRain = totalRain + weatherStation.get_current_rain_total()/25.4
-  	print("Rain Total=\t%0.2f in")%(totalRain)
-  	print("Wind Speed=\t%0.2f MPH")%(currentWindSpeed)
-	if (config.OLED_Present):
-		Scroll_SSD1306.addLineOLED(display,  ("Wind Speed=\t%0.2f MPH")%(currentWindSpeed))
-		Scroll_SSD1306.addLineOLED(display,  ("Rain Total=\t%0.2f in")%(totalRain))
-  		if (config.ADS1015_Present or config.ADS1115_Present):	
-			Scroll_SSD1306.addLineOLED(display,  "Wind Dir=%0.2f Degrees" % weatherStation.current_wind_direction())
-
-    	print("MPH wind_gust=\t%0.2f MPH")%(currentWindGust)
+ 	currentWindSpeed = weatherStation.current_wind_speed()
+  	currentWindGust = weatherStation.get_wind_gust()
+  	totalRain = totalRain + weatherStation.get_current_rain_total()
+  	print("Rain Total=\t%0.2f cm")%(totalRain)
+  	print("Wind Speed=\t%0.2f Km/h")%(currentWindSpeed)
+    	print("Km/h wind_gust=\t%0.2f Km/h")%(currentWindGust)
   	if (config.ADS1015_Present or config.ADS1115_Present):	
 		print "Wind Direction=\t\t\t %0.2f Degrees" % weatherStation.current_wind_direction()
 		print "Wind Direction Voltage=\t\t %0.3f V" % weatherStation.current_wind_direction_voltage()
@@ -242,10 +181,6 @@ while True:
 		print 'Pressure = \t{0:0.2f} KPa'.format(bmp280.read_pressure()/1000)
 		print 'Altitude = \t{0:0.2f} m'.format(bmp280.read_altitude())
 		print 'Sealevel Pressure = \t{0:0.2f} KPa'.format(bmp280.read_sealevel_pressure()/1000)
-		if (config.OLED_Present):
-			Scroll_SSD1306.addLineOLED(display, 'Press= \t{0:0.2f} KPa'.format(bmp280.read_pressure()/1000))
-			if (config.HTU21DF_Present == False):
-				Scroll_SSD1306.addLineOLED(display, 'InTemp= \t{0:0.2f} C'.format(bmp280.read_temperature()))
 	print "----------------- "
 
 	print "----------------- "
@@ -264,8 +199,6 @@ while True:
 		HTUhumidity = float(splitstring[1])	
 		print "Temperature = \t%0.2f C" % HTUtemperature
 		print "Humidity = \t%0.2f %%" % HTUhumidity
-		if (config.OLED_Present):
-			Scroll_SSD1306.addLineOLED(display,  "InTemp = \t%0.2f C" % HTUtemperature)
 	print "----------------- "
 
 	print "Sleeping 10 seconds"
